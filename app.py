@@ -6,7 +6,7 @@ import time
 st.set_page_config(page_title="Gates of Olympus Mini", layout="centered")
 st.markdown("<h1 style='text-align:center;'>🎰 Gates of Olympus Mini</h1>", unsafe_allow_html=True)
 
-# Simbol & warna
+# Simbol dan warna
 symbols = ["⚡", "💎", "🔥", "💰", "👑", "🌀", "🔱"]
 colors = {"⚡": "gold", "💎": "cyan", "🔥": "red", "💰": "orange", "👑": "purple", "🌀": "blue", "🔱": "green"}
 
@@ -20,24 +20,23 @@ if 'last_win' not in st.session_state:
 if 'bet' not in st.session_state:
     st.session_state.bet = 100
 
-# Sidebar kontrol taruhan
-st.sidebar.header("🎚️ Kontrol Taruhan")
-bet_input = st.sidebar.slider("Pilih jumlah taruhan (BET)", min_value=50, max_value=1000, step=50, value=st.session_state.bet)
-st.session_state.bet = bet_input
+# Sidebar pengaturan BET
+st.sidebar.header("🎚️ Taruhan")
+st.session_state.bet = st.sidebar.slider("Pilih jumlah BET", 50, 1000, 100, step=50)
 
-# Tampilkan saldo & info
+# Info utama
 st.markdown(f"""
-<b>💰 Saldo:</b> {st.session_state.saldo}  
-<b>🎯 Taruhan:</b> {st.session_state.bet}  
-<b>🎁 Free Spins:</b> {st.session_state.freespins}  
-<b>🏆 Menang Terakhir:</b> {st.session_state.last_win}  
-""", unsafe_allow_html=True)
+**💰 Saldo:** {st.session_state.saldo}  
+**🎯 Taruhan (BET):** {st.session_state.bet}  
+**🎁 Free Spins:** {st.session_state.freespins}  
+**🏆 Menang Terakhir:** {st.session_state.last_win}
+""")
 
-# Fungsi untuk membuat grid slot
+# Fungsi untuk membuat grid
 def spin_grid():
     return [[random.choice(symbols) for _ in range(6)] for _ in range(5)]
 
-# Fungsi cek kombinasi menang
+# Cek simbol yang cocok
 def check_matches(grid):
     matches = []
     for r in range(5):
@@ -48,21 +47,21 @@ def check_matches(grid):
                     count += 1
                 else:
                     if count >= 3:
-                        matches += [(r, cc) for cc in range(c - count, c)]
+                        matches += [(r, cc) for cc in range(c-count, c)]
                     count = 0
             if count >= 3:
-                matches += [(r, cc) for cc in range(6 - count, 6)]
+                matches += [(r, cc) for cc in range(6-count, 6)]
     return matches
 
-# Tampilkan animasi koin
+# Animasi koin
 def show_coin_animation():
     st.markdown("""
     <div style="text-align:center;">
-      <img src="https://media.giphy.com/media/3oEjI6SIIHBdRxXI40/giphy.gif" width="200"/>
+      <img src="https://media.giphy.com/media/3oEjI6SIIHBdRxXI40/giphy.gif" width="150"/>
     </div>
     """, unsafe_allow_html=True)
 
-# Tampilkan grid dengan efek menang
+# Tampilkan grid dan animasi
 def display_and_animate(grid, matches):
     for r in range(5):
         line = ""
@@ -79,7 +78,7 @@ def display_and_animate(grid, matches):
         show_coin_animation()
         time.sleep(0.5)
 
-# Fungsi jatuhkan simbol (tumble)
+# Tumble symbol
 def tumble(grid, matches):
     cols = {}
     for r, c in matches:
@@ -88,11 +87,11 @@ def tumble(grid, matches):
         rows.sort()
         for r in rows:
             for i in range(r, 0, -1):
-                grid[i][c] = grid[i - 1][c]
+                grid[i][c] = grid[i-1][c]
             grid[0][c] = random.choice(symbols)
     return grid
 
-# Fungsi utama spin
+# Proses Spin
 def play_spin():
     st.session_state.saldo -= st.session_state.bet
     grid = spin_grid()
@@ -107,43 +106,45 @@ def play_spin():
         had_match = True
         win_piece = len(matches) * (st.session_state.bet // 10)
         total_win += win_piece
-        st.write(f"⚡ Matched {len(matches)} simbol → +{win_piece}")
         grid = tumble(grid, matches)
 
-    # Multiplier 30% saat menang
+    # Multiplier 30%
     if had_match and random.random() < 0.3:
-        mul = random.choice([2, 3, 5, 10, 25])
-        total_win *= mul
-        st.markdown(f"<h3 style='color:gold;'>🔥 Multiplier x{mul}! Total Menang: +{total_win}</h3>", unsafe_allow_html=True)
+        multiplier = random.choice([2, 3, 5, 10, 25])
+        total_win *= multiplier
+        st.success(f"🔥 Multiplier x{multiplier}! Total Menang: {total_win}")
     elif had_match:
-        st.markdown(f"<h4 style='color:lime;'>Total Menang: +{total_win}</h4>", unsafe_allow_html=True)
+        st.success(f"🎉 Total Menang: {total_win}")
+    else:
+        st.info("😢 Belum beruntung.")
 
-    # Scatter Free Spin
+    # Free spin 10%
     if random.random() < 0.1:
         fs = random.randint(1, 3)
         st.session_state.freespins += fs
         st.balloons()
-        st.success(f"🎉 Scatter! +{fs} Free Spins")
+        st.success(f"🎁 Scatter! Dapat {fs} Free Spin!")
 
     st.session_state.last_win = total_win
     return total_win
 
-# Tombol spin
+# Tombol aksi
 if st.session_state.freespins > 0:
     if st.button("🔁 Free Spin"):
         st.session_state.freespins -= 1
         win = play_spin()
         st.session_state.saldo += win
 else:
-    if st.button("▶️ Spin"):
+    if st.button("▶️ SPIN"):
         if st.session_state.saldo >= st.session_state.bet:
             win = play_spin()
             st.session_state.saldo += win
         else:
-            st.warning("Saldo tidak cukup untuk taruhan.")
+            st.warning("Saldo tidak cukup!")
 
+# Reset game
 if st.button("🔄 Reset Game"):
     st.session_state.saldo = 10000
     st.session_state.freespins = 0
     st.session_state.last_win = 0
-    st.success("Game telah di-reset.")
+    st.success("Game di-reset.")
