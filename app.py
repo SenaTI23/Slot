@@ -44,7 +44,7 @@ def compress_with_target(input_path, target_mb):
     out_dir = tempfile.gettempdir()
     output_path = os.path.join(out_dir, "compressed_" + base)
 
-    original_size = os.path.getsize(input_path) / 1024 / 1024
+    original_size = os.path.getsize(input_path) / 1024 / 1024  # in MB
     target_ratio = target_mb / original_size
 
     if input_ext in ['.pdf']:
@@ -93,21 +93,29 @@ def compress_with_target(input_path, target_mb):
 
 # ================= STREAMLIT UI =================
 
-st.title("📦 File Compressor with Target Size")
-st.write("Upload file besar dan masukkan ukuran target (MB). Kami akan kompres otomatis!")
+st.title("📦 File Compressor with Target Size (MB)")
+st.markdown("Upload file besar dan masukkan ukuran target dalam MB. Kami bantu kompres otomatis!")
 
 uploaded = st.file_uploader("📁 Upload File", type=None)
 target_size = st.number_input("🎯 Target Ukuran File (MB)", min_value=1.0, step=1.0)
 
 if uploaded and target_size:
-    with tempfile.NamedTemporaryFile(delete=False) as tmp:
-        tmp.write(uploaded.read())
-        tmp_path = tmp.name
+    try:
+        file_name = uploaded.name
+        temp_dir = tempfile.mkdtemp()
+        tmp_path = os.path.join(temp_dir, file_name)
 
-    with st.spinner("🔄 Mengompres file..."):
-        output_path, original_size = compress_with_target(tmp_path, target_size)
-        final_size = os.path.getsize(output_path) / 1024 / 1024
+        with open(tmp_path, "wb") as f:
+            f.write(uploaded.read())
 
-    st.success(f"✅ Selesai! Ukuran awal: {original_size:.2f} MB → hasil: {final_size:.2f} MB")
-    with open(output_path, "rb") as f:
-        st.download_button("⬇️ Download File Terkompres", f, file_name=os.path.basename(output_path))
+        with st.spinner("🔄 Sedang mengompres file..."):
+            output_path, original_size = compress_with_target(tmp_path, target_size)
+            final_size = os.path.getsize(output_path) / 1024 / 1024
+
+        st.success(f"✅ Kompresi selesai!")
+        st.markdown(f"📦 Ukuran awal: **{original_size:.2f} MB**  \n📉 Ukuran akhir: **{final_size:.2f} MB**")
+
+        with open(output_path, "rb") as f:
+            st.download_button("⬇️ Download File Terkompres", f, file_name=os.path.basename(output_path))
+    except Exception as e:
+        st.error(f"❌ Gagal mengompres: {str(e)}")
