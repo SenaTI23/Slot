@@ -1,79 +1,110 @@
 import streamlit as st
 import random
+import time
 
-st.set_page_config(page_title="⚡ Gates of Olympus Mini", layout="wide")
-st.markdown("<h1 style='text-align:center;'>⚡ GATES OF OLYMPUS MINI</h1>", unsafe_allow_html=True)
+# Streamlit setup
+st.set_page_config(page_title="Gates of Olympus Mini", layout="centered")
+st.markdown("<h1 style='text-align:center;'>🎰 Gates of Olympus Mini</h1>", unsafe_allow_html=True)
 
-# Simbol Olympus-style
-symbols = ["⚡", "💎", "🔥", "💰", "👑", "🌀", "🔱"]
-colors = {
-    "⚡": "yellow",
-    "💎": "cyan",
-    "🔥": "red",
-    "💰": "orange",
-    "👑": "gold",
-    "🌀": "purple",
-    "🔱": "green"
-}
+# Simbol dan warna
+symbols = ["⚡","💎","🔥","💰","👑","🌀","🔱"]
+colors = {"⚡":"gold","💎":"cyan","🔥":"red","💰":"orange","👑":"purple","🌀":"blue","🔱":"green"}
 
-# Init saldo
+# Inisialisasi state
 if 'saldo' not in st.session_state:
-    st.session_state.saldo = 2000
+    st.session_state.saldo = 10000
+if 'freespins' not in st.session_state:
+    st.session_state.freespins = 0
 
 bet = 100
-multiplier = random.choice([1, 2, 3, 5, 10, 15, 25, 50])
+mult = random.choice([2,3,5,10,20,50,100,200,500])
 
+# Header info
 st.markdown(f"""
-<div style='text-align:center;'>
-    💰 <b>Saldo:</b> {st.session_state.saldo} &nbsp;&nbsp; | 
-    🎯 <b>Taruhan:</b> {bet} &nbsp;&nbsp; | 
-    ✨ <b>Multiplier Acak:</b> x{multiplier}
-</div><br>
-""", unsafe_allow_html=True)
+**Saldo:** {st.session_state.saldo} &nbsp; | &nbsp;
+**Bet:** {bet} &nbsp; | &nbsp;
+**Multiplier:** x{mult} &nbsp; | &nbsp;
+**Free Spins:** {st.session_state.freespins}
+""")
 
-# SPIN
+# Fungsi spin & tumble
 def spin_grid():
     return [[random.choice(symbols) for _ in range(6)] for _ in range(5)]
 
-# Cek kemenangan sederhana (baris penuh simbol sama)
-def check_win(grid):
-    win_coords = []
+def check_matches(grid):
+    matches = []
     for r in range(5):
-        row = grid[r]
-        for sym in set(row):
-            if row.count(sym) >= 3:
-                win_coords.append((r, sym))
-    return win_coords
+        for sym in symbols:
+            cnt = grid[r].count(sym)
+            if cnt >= 3:
+                for c in range(6):
+                    if grid[r][c]==sym:
+                        matches.append((r,c))
+    return matches
 
-# Tampilkan grid
-def display_grid(grid, wins):
-    for r, row in enumerate(grid):
+def tumble(grid, matches):
+    # Hapus matches: replace with random above
+    for r,c in sorted(matches):
+        for rr in range(r,0,-1):
+            grid[rr][c]=grid[rr-1][c]
+        grid[0][c]=random.choice(symbols)
+    return grid
+
+def display(grid, matches):
+    for r in range(5):
         line = ""
-        for sym in row:
-            color = colors[sym]
-            if any(r == win_r and sym == win_sym for win_r, win_sym in wins):
-                line += f"<span style='color:{color};font-size:30px;'><b>{sym}</b></span> "
+        for c in range(6):
+            sym = grid[r][c]
+            col = colors[sym]
+            if (r,c) in matches:
+                line += f"<span style='color:{col};font-size:32px;'><b>{sym}</b></span> "
             else:
-                line += f"<span style='color:gray;font-size:26px;'>{sym}</span> "
-        st.markdown(f"<div style='text-align:center;'>{line}</div>", unsafe_allow_html=True)
+                line += f"<span style='color:gray;font-size:24px;'>{sym}</span> "
+        st.markdown(f"<div style='text-align:center'>{line}</div>", unsafe_allow_html=True)
 
-if st.button("🎰 SPIN SEKARANG"):
-    if st.session_state.saldo < bet:
-        st.error("Saldo tidak cukup!")
-    else:
-        st.session_state.saldo -= bet
-        grid = spin_grid()
-        wins = check_win(grid)
-        display_grid(grid, wins)
+# Spin atau FreeSpin
+def play_spin():
+    st.session_state.saldo -= bet
+    total_mult = mult
+    win = 0
+    grid = spin_grid()
+    step = 1
+    
+    while True:
+        matches = check_matches(grid)
+        display(grid, matches)
+        if not matches:
+            break
+        step_win = len(matches)*bet*total_mult
+        win += step_win
+        st.write(f"Step {step}: matched {len(matches)} symbols → +{step_win}")
+        grid = tumble(grid, matches)
+        step += 1
+        time.sleep(0.3)
 
-        if wins:
-            total_win = bet * len(wins) * multiplier
-            st.success(f"🎉 MENANG x{multiplier}! Total: +{total_win}")
-            st.session_state.saldo += total_win
-            st.balloons()
-        else:
-            st.warning("😢 Belum menang!")
+    # Scatter FreeSpin random: 10% chance
+    if random.random()<0.1:
+        fs = random.randint(1,3)
+        st.balloons()
+        st.write(f"🎉 Scatter! Kamu dapat {fs} Free Spins!")
+        st.session_state.freespins += fs
+
+    return win
+
+# Tombol play
+if st.session_state.freespins>0:
+    if st.button("🔁 Free Spin"):
+        st.session_state.freespins -= 1
+        win = play_spin()
+        st.success(f"Free Spin Win: +{win}")
+        st.session_state.saldo += win
+else:
+    if st.button("🔁 Spin"):
+        win = play_spin()
+        st.success(f"Win: +{win}")
+        st.session_state.saldo += win
 
 if st.button("🔄 Reset Game"):
-    st.session_state.saldo = 2000
-    st.info("Game di-reset. Saldo kembali ke 2000.")
+    st.session_state.saldo=10000
+    st.session_state.freespins=0
+    st.success("Game Reset")
