@@ -1,8 +1,9 @@
 import os
-import zipfile
 import tempfile
+import zipfile
+import streamlit as st
 from PIL import Image
-import fitz
+import fitz  # PyMuPDF
 import subprocess
 
 def compress_pdf(input_path, output_path):
@@ -11,8 +12,7 @@ def compress_pdf(input_path, output_path):
     return os.path.getsize(output_path)
 
 def compress_image(input_path, output_path, quality, resize_ratio=1.0):
-    img = Image.open(input_path)
-    img = img.convert("RGB")
+    img = Image.open(input_path).convert("RGB")
     if resize_ratio < 1.0:
         img = img.resize((int(img.width * resize_ratio), int(img.height * resize_ratio)))
     img.save(output_path, optimize=True, quality=quality)
@@ -44,10 +44,8 @@ def compress_with_target(input_path, target_mb):
     out_dir = tempfile.gettempdir()
     output_path = os.path.join(out_dir, "compressed_" + base)
 
-    original_size = os.path.getsize(input_path) / 1024 / 1024  # in MB
+    original_size = os.path.getsize(input_path) / 1024 / 1024
     target_ratio = target_mb / original_size
-
-    print(f"📥 Original: {original_size:.2f} MB | 🎯 Target: {target_mb:.2f} MB")
 
     if input_ext in ['.pdf']:
         compress_pdf(input_path, output_path)
@@ -91,14 +89,25 @@ def compress_with_target(input_path, target_mb):
         output_path += ".zip"
         zip_file(input_path, output_path)
 
-    final_size = os.path.getsize(output_path) / 1024 / 1024
-    print(f"✅ Hasil akhir: {final_size:.2f} MB")
-    print(f"📁 Lokasi: {output_path}")
-    return output_path
+    return output_path, original_size
 
-# ======== Contoh penggunaan ========
-# Ganti path ke file kamu
-file_path = "/content/video_200mb.mp4"
-target_size_mb = 20  # Target hasil kompresi
+# ================= STREAMLIT UI =================
 
-compress_with_target(file_path, target_size_mb)
+st.title("📦 File Compressor with Target Size")
+st.write("Upload file besar dan masukkan ukuran target (MB). Kami akan kompres otomatis!")
+
+uploaded = st.file_uploader("📁 Upload File", type=None)
+target_size = st.number_input("🎯 Target Ukuran File (MB)", min_value=1.0, step=1.0)
+
+if uploaded and target_size:
+    with tempfile.NamedTemporaryFile(delete=False) as tmp:
+        tmp.write(uploaded.read())
+        tmp_path = tmp.name
+
+    with st.spinner("🔄 Mengompres file..."):
+        output_path, original_size = compress_with_target(tmp_path, target_size)
+        final_size = os.path.getsize(output_path) / 1024 / 1024
+
+    st.success(f"✅ Selesai! Ukuran awal: {original_size:.2f} MB → hasil: {final_size:.2f} MB")
+    with open(output_path, "rb") as f:
+        st.download_button("⬇️ Download File Terkompres", f, file_name=os.path.basename(output_path))
