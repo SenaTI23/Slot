@@ -1,9 +1,12 @@
 import streamlit as st
 import random
-import time
 
-# Simbol & Warna
-symbol_colors = {
+st.set_page_config(page_title="⚡ Gates of Olympus Mini", layout="wide")
+st.markdown("<h1 style='text-align:center;'>⚡ GATES OF OLYMPUS MINI</h1>", unsafe_allow_html=True)
+
+# Simbol Olympus-style
+symbols = ["⚡", "💎", "🔥", "💰", "👑", "🌀", "🔱"]
+colors = {
     "⚡": "yellow",
     "💎": "cyan",
     "🔥": "red",
@@ -12,67 +15,65 @@ symbol_colors = {
     "🌀": "purple",
     "🔱": "green"
 }
-symbols = list(symbol_colors.keys())
 
-# Konfigurasi Streamlit
-st.set_page_config(page_title="⚡ Olympus Slot", layout="centered")
-st.markdown("<h1 style='text-align:center;'>🎰 SLOT OLYMPUS</h1>", unsafe_allow_html=True)
-
-# Inisialisasi saldo
-if "saldo" not in st.session_state:
-    st.session_state.saldo = 1000
+# Init saldo
+if 'saldo' not in st.session_state:
+    st.session_state.saldo = 2000
 
 bet = 100
-st.markdown(
-    f"<div style='text-align:center;font-size:18px;'>💰 <b>Saldo:</b> {st.session_state.saldo} &nbsp;&nbsp; | &nbsp;&nbsp; 🎯 <b>Taruhan:</b> {bet}</div><br>",
-    unsafe_allow_html=True
-)
+multiplier = random.choice([1, 2, 3, 5, 10, 15, 25, 50])
 
-# Spin Reels
-def spin_reels():
-    return [[random.choice(symbols) for _ in range(5)] for _ in range(3)]
+st.markdown(f"""
+<div style='text-align:center;'>
+    💰 <b>Saldo:</b> {st.session_state.saldo} &nbsp;&nbsp; | 
+    🎯 <b>Taruhan:</b> {bet} &nbsp;&nbsp; | 
+    ✨ <b>Multiplier Acak:</b> x{multiplier}
+</div><br>
+""", unsafe_allow_html=True)
 
-# Cek kemenangan: jika semua simbol dalam 1 baris sama
+# SPIN
+def spin_grid():
+    return [[random.choice(symbols) for _ in range(6)] for _ in range(5)]
+
+# Cek kemenangan sederhana (baris penuh simbol sama)
 def check_win(grid):
-    winning_rows = []
-    for idx, row in enumerate(grid):
-        if len(set(row)) == 1:
-            winning_rows.append(idx)
-    return winning_rows
+    win_coords = []
+    for r in range(5):
+        row = grid[r]
+        for sym in set(row):
+            if row.count(sym) >= 3:
+                win_coords.append((r, sym))
+    return win_coords
 
-# Tampilkan grid dengan highlight kemenangan
-def display_grid(grid, win_rows):
-    for i, row in enumerate(grid):
+# Tampilkan grid
+def display_grid(grid, wins):
+    for r, row in enumerate(grid):
         line = ""
         for sym in row:
-            color = symbol_colors[sym]
-            if i in win_rows:
-                line += f"<span style='color:{color};font-size:28px;'><b>{sym}</b></span> "
+            color = colors[sym]
+            if any(r == win_r and sym == win_sym for win_r, win_sym in wins):
+                line += f"<span style='color:{color};font-size:30px;'><b>{sym}</b></span> "
             else:
-                line += f"<span style='color:gray;font-size:24px;'>{sym}</span> "
+                line += f"<span style='color:gray;font-size:26px;'>{sym}</span> "
         st.markdown(f"<div style='text-align:center;'>{line}</div>", unsafe_allow_html=True)
 
-# Tombol SPIN
-if st.button("🔁 SPIN!"):
+if st.button("🎰 SPIN SEKARANG"):
     if st.session_state.saldo < bet:
-        st.error("💸 Saldo tidak cukup!")
+        st.error("Saldo tidak cukup!")
     else:
         st.session_state.saldo -= bet
-        hasil = spin_reels()
-        win_rows = check_win(hasil)
+        grid = spin_grid()
+        wins = check_win(grid)
+        display_grid(grid, wins)
 
-        st.markdown("### 🎰 Hasil:")
-        display_grid(hasil, win_rows)
-
-        if win_rows:
-            menang = bet * 5 * len(win_rows)
-            st.success(f"🎉 Kemenangan di {len(win_rows)} baris! +{menang}")
-            st.session_state.saldo += menang
+        if wins:
+            total_win = bet * len(wins) * multiplier
+            st.success(f"🎉 MENANG x{multiplier}! Total: +{total_win}")
+            st.session_state.saldo += total_win
             st.balloons()
         else:
-            st.warning("😢 Belum beruntung.")
+            st.warning("😢 Belum menang!")
 
-# Tombol Reset
 if st.button("🔄 Reset Game"):
-    st.session_state.saldo = 1000
-    st.info("🔁 Game di-reset! Saldo kembali ke 1000.")
+    st.session_state.saldo = 2000
+    st.info("Game di-reset. Saldo kembali ke 2000.")
