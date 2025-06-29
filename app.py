@@ -1,97 +1,104 @@
-import streamlit as st
 import os
-import tempfile
-import shutil
 import zipfile
+import tempfile
 from PIL import Image
+import fitz
 import subprocess
-import fitz  # PyMuPDF for PDFs
-
-st.set_page_config(page_title="📦 Universal File Compressor", layout="centered")
-
-st.title("📦 Universal File Compressor")
-st.markdown("Unggah file besar dan kompres secara otomatis tanpa merusak isi.")
-
-uploaded_file = st.file_uploader("📁 Upload File", type=None)
-
-compression_level = st.selectbox("Pilih level kompresi:", ["Ringan", "Sedang", "Tinggi"])
 
 def compress_pdf(input_path, output_path):
-    try:
-        pdf = fitz.open(input_path)
-        pdf.save(output_path, garbage=4, deflate=True)
-        return True
-    except Exception as e:
-        st.error(f"Gagal kompres PDF: {e}")
-        return False
+    pdf = fitz.open(input_path)
+    pdf.save(output_path, garbage=4, deflate=True)
+    return os.path.getsize(output_path)
 
-def compress_image(input_path, output_path, quality):
-    try:
-        img = Image.open(input_path)
-        img.save(output_path, optimize=True, quality=quality)
-        return True
-    except Exception as e:
-        st.error(f"Gagal kompres gambar: {e}")
-        return False
+def compress_image(input_path, output_path, quality, resize_ratio=1.0):
+    img = Image.open(input_path)
+    img = img.convert("RGB")
+    if resize_ratio < 1.0:
+        img = img.resize((int(img.width * resize_ratio), int(img.height * resize_ratio)))
+    img.save(output_path, optimize=True, quality=quality)
+    return os.path.getsize(output_path)
 
 def compress_video(input_path, output_path, crf):
-    try:
-        result = subprocess.run([
-            "ffmpeg", "-y", "-i", input_path,
-            "-vcodec", "libx264", "-crf", str(crf),
-            "-preset", "slow", output_path
-        ], capture_output=True)
-        return result.returncode == 0
-    except Exception as e:
-        st.error(f"Gagal kompres video: {e}")
-        return False
+    subprocess.run([
+        'ffmpeg', '-y', '-i', input_path,
+        '-vcodec', 'libx264', '-crf', str(crf),
+        '-preset', 'veryslow', output_path
+    ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    return os.path.getsize(output_path)
 
-def zip_file(file_path, output_path):
-    try:
-        with zipfile.ZipFile(output_path, 'w', zipfile.ZIP_DEFLATED) as zf:
-            zf.write(file_path, os.path.basename(file_path))
-        return True
-    except Exception as e:
-        st.error(f"Gagal zip file: {e}")
-        return False
+def compress_audio(input_path, output_path, bitrate):
+    subprocess.run([
+        'ffmpeg', '-y', '-i', input_path,
+        '-b:a', bitrate, output_path
+    ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    return os.path.getsize(output_path)
 
-if uploaded_file:
-    with tempfile.NamedTemporaryFile(delete=False) as tmp_input:
-        tmp_input.write(uploaded_file.read())
-        input_path = tmp_input.name
+def zip_file(input_path, output_path):
+    with zipfile.ZipFile(output_path, 'w', zipfile.ZIP_DEFLATED) as zf:
+        zf.write(input_path, os.path.basename(input_path))
+    return os.path.getsize(output_path)
 
-    original_size = os.path.getsize(input_path) / 1024 / 1024  # MB
-    file_ext = os.path.splitext(uploaded_file.name)[1].lower()
+def compress_with_target(input_path, target_mb):
+    input_ext = os.path.splitext(input_path)[1].lower()
+    base = os.path.basename(input_path)
+    out_dir = tempfile.gettempdir()
+    output_path = os.path.join(out_dir, "compressed_" + base)
 
-    st.info(f"Ukuran asli: {original_size:.2f} MB")
-    compressed_path = input_path + "_compressed" + file_ext
+    original_size = os.path.getsize(input_path) / 1024 / 1024  # in MB
+    target_ratio = target_mb / original_size
 
-    success = False
+    print(f"📥 Original: {original_size:.2f} MB | 🎯 Target: {target_mb:.2f} MB")
 
-    with st.spinner("🔄 Mengompres file..."):
+    if input_ext in ['.pdf']:
+        compress_pdf(input_path, output_path)
 
-        if file_ext in [".pdf"]:
-            success = compress_pdf(input_path, compressed_path)
-
-        elif file_ext in [".jpg", ".jpeg", ".png", ".webp"]:
-            q = 85 if compression_level == "Ringan" else 65 if compression_level == "Sedang" else 40
-            success = compress_image(input_path, compressed_path, quality=q)
-
-        elif file_ext in [".mp4", ".mov", ".avi", ".mkv"]:
-            crf = 23 if compression_level == "Ringan" else 28 if compression_level == "Sedang" else 33
-            compressed_path = input_path + "_compressed.mp4"
-            success = compress_video(input_path, compressed_path, crf=crf)
-
+    elif input_ext in ['.jpg', '.jpeg', '.png', '.webp']:
+        if target_ratio > 0.8:
+            quality, resize = 85, 1.0
+        elif target_ratio > 0.5:
+            quality, resize = 60, 0.9
+        elif target_ratio > 0.2:
+            quality, resize = 40, 0.8
         else:
-            compressed_path = input_path + ".zip"
-            success = zip_file(input_path, compressed_path)
+            quality, resize = 25, 0.6
+        compress_image(input_path, output_path, quality, resize)
 
-    if success:
-        compressed_size = os.path.getsize(compressed_path) / 1024 / 1024
-        saved_percent = 100 * (1 - compressed_size / original_size)
-        st.success(f"✅ Kompresi selesai! Ukuran baru: {compressed_size:.2f} MB ({saved_percent:.1f}% lebih kecil)")
+    elif input_ext in ['.mp4', '.mov', '.avi', '.mkv']:
+        if target_ratio > 0.8:
+            crf = 22
+        elif target_ratio > 0.5:
+            crf = 28
+        elif target_ratio > 0.2:
+            crf = 35
+        else:
+            crf = 40
+        output_path = output_path.replace(input_ext, ".mp4")
+        compress_video(input_path, output_path, crf)
 
-        with open(compressed_path, "rb") as f:
-            st.download_button("⬇️ Download File Terkompres", f, file_name=os.path.basename(compressed_path))
+    elif input_ext in ['.mp3', '.wav', '.ogg', '.aac']:
+        if target_ratio > 0.8:
+            bitrate = "192k"
+        elif target_ratio > 0.5:
+            bitrate = "128k"
+        elif target_ratio > 0.2:
+            bitrate = "64k"
+        else:
+            bitrate = "32k"
+        output_path = output_path.replace(input_ext, ".mp3")
+        compress_audio(input_path, output_path, bitrate)
+
     else:
-        st.error("❌ Gagal kompres file.")
+        output_path += ".zip"
+        zip_file(input_path, output_path)
+
+    final_size = os.path.getsize(output_path) / 1024 / 1024
+    print(f"✅ Hasil akhir: {final_size:.2f} MB")
+    print(f"📁 Lokasi: {output_path}")
+    return output_path
+
+# ======== Contoh penggunaan ========
+# Ganti path ke file kamu
+file_path = "/content/video_200mb.mp4"
+target_size_mb = 20  # Target hasil kompresi
+
+compress_with_target(file_path, target_size_mb)
