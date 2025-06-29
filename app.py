@@ -1,12 +1,10 @@
-# Simple Ludo Game Logic (text-based)
-
 import random
 import time
 
-# Inisialisasi posisi token
+# Setup game
 player_positions = {"Player 1": 0, "Player 2": 0}
 turn = "Player 1"
-goal = 30  # target posisi untuk menang
+goal = 30  # Finish line
 
 def roll_dice():
     return random.randint(1, 6)
@@ -25,20 +23,21 @@ def check_winner():
     return False
 
 def display_board():
-    board = ["_" for _ in range(goal+1)]
+    board = ["_" for _ in range(goal + 1)]
     for player, pos in player_positions.items():
         if pos <= goal:
-            board[pos] = player[0]  # P1 / P2
+            board[pos] = player[0]  # P1 or P2
     print("Board: ", " ".join(board))
 
-# Main game loop
+# Run game automatically
 def play_game():
     global turn
     game_over = False
-    print("🎲 Ludo Game Start (2 Players, 1 Token Each)\n")
-    
+    print("🎲 Ludo Game Start (Auto Turns)\n")
+
+    round_counter = 1
     while not game_over:
-        input(f"{turn}, press Enter to roll the dice...")
+        print(f"\n--- Round {round_counter} ---")
         steps = roll_dice()
         move_player(turn, steps)
         display_board()
@@ -46,7 +45,8 @@ def play_game():
         if not game_over:
             turn = "Player 2" if turn == "Player 1" else "Player 1"
         time.sleep(1)
-        
+        round_counter += 1
+
     print("Game Over.")
 
 play_game()
