@@ -1,15 +1,15 @@
 import streamlit as st
 import random
 
-# Setup awal
+# Atur halaman
 st.set_page_config(page_title="⚡ Olympus Mini", layout="centered")
 
-# Simbol dasar
+# Simbol-simbol
 basic_symbols = ["⚡", "💎", "🔥", "💰", "👑", "🌀", "🔱"]
 scatter_symbol = "🟡"
 multiplier_symbols = ["🔵2x", "🔵5x", "🔵10x", "🔵25x", "🔵50x", "🔵100x", "🔵500x"]
 
-# State Streamlit
+# Streamlit states
 if "saldo" not in st.session_state:
     st.session_state.saldo = 10000
 if "bet" not in st.session_state:
@@ -18,12 +18,14 @@ if "freespin" not in st.session_state:
     st.session_state.freespin = 0
 if "total_win" not in st.session_state:
     st.session_state.total_win = 0
+if "spin_count" not in st.session_state:
+    st.session_state.spin_count = 0
 
-# Sidebar pengaturan taruhan
-st.sidebar.title("🎚️ Taruhan")
-st.session_state.bet = st.sidebar.slider("Bet", 50, 1000, st.session_state.bet, 50)
+# Sidebar pengaturan
+st.sidebar.title("🎚️ Pengaturan Taruhan")
+st.session_state.bet = st.sidebar.slider("BET", 50, 1000, st.session_state.bet, 50)
 
-# Header
+# Header UI
 st.title("⚡ Olympus Mini Slot")
 st.markdown(f"""
 **💰 Saldo:** `{st.session_state.saldo}`  
@@ -32,28 +34,25 @@ st.markdown(f"""
 **🏆 Menang Terakhir:** `{st.session_state.total_win}`
 """)
 
-# Fungsi: generate simbol acak
+# Fungsi spin grid
 def spin(free_spin=False):
     grid = []
-    for _ in range(5):
+    for _ in range(5):  # baris
         row = []
-        for _ in range(6):
+        for _ in range(6):  # kolom
             if free_spin:
                 sym = random.choice(basic_symbols)
                 row.append(sym)
             else:
-                # Scatter lebih jarang (1 dari 12 kesempatan)
                 sym = random.choices(
                     basic_symbols + [scatter_symbol],
                     weights=[12]*len(basic_symbols) + [1]
                 )[0]
                 row.append(sym)
         grid.append(row)
-    
-    # Tambahkan multiplier acak hanya di free spin
+    # Tambah multiplier acak jika free spin
     if free_spin:
-        num_multi = random.randint(1, 4)  # maksimal 4 multiplier
-        for _ in range(num_multi):
+        for _ in range(random.randint(1, 4)):
             r = random.randint(0, 4)
             c = random.randint(0, 5)
             row_symbol = random.choice(multiplier_symbols)
@@ -64,8 +63,8 @@ def spin(free_spin=False):
 def count_scatters(grid):
     return sum(sym == scatter_symbol for row in grid for sym in row)
 
-# Cek kemenangan: 3 atau lebih berturut
-def get_matches(grid):
+# Cek kemenangan dengan win_boost dinamis
+def get_matches(grid, win_boost=1.0):
     matches = []
     for r in range(5):
         count = 1
@@ -73,14 +72,14 @@ def get_matches(grid):
             if grid[r][c] == grid[r][c - 1] and grid[r][c] in basic_symbols:
                 count += 1
             else:
-                if count >= 3:
+                if count >= 3 and random.random() < win_boost:
                     matches.append((grid[r][c - 1], count))
                 count = 1
-        if count >= 3:
+        if count >= 3 and random.random() < win_boost:
             matches.append((grid[r][5], count))
     return matches
 
-# Total multiplier
+# Hitung total multiplier
 def get_multiplier(grid):
     total = 1
     for row in grid:
@@ -93,16 +92,26 @@ def get_multiplier(grid):
                     pass
     return total
 
-# Tampilkan grid slot
+# Tampilkan grid
 def show_grid(grid):
     for row in grid:
-        st.markdown(f"<div style='text-align:center; font-size:32px'>{' '.join(row)}</div>", unsafe_allow_html=True)
+        st.markdown(f"<div style='text-align:center; font-size:30px'>{' '.join(row)}</div>", unsafe_allow_html=True)
 
-# Main proses spin
+# Proses SPIN
 def do_spin():
+    st.session_state.spin_count += 1
+
+    if st.session_state.spin_count <= 10:
+        win_boost = 1.0  # awal: gampang menang
+    elif st.session_state.spin_count <= 30:
+        win_boost = 0.7
+    else:
+        win_boost = 0.3  # makin susah
+
     if st.session_state.freespin > 0:
         free = True
         st.session_state.freespin -= 1
+        win_boost = 0.8
     else:
         free = False
         if st.session_state.saldo < st.session_state.bet:
@@ -114,7 +123,7 @@ def do_spin():
     show_grid(grid)
 
     scatters = count_scatters(grid)
-    matches = get_matches(grid)
+    matches = get_matches(grid, win_boost)
     multiplier = get_multiplier(grid) if free else 1
 
     win = sum(count * (st.session_state.bet // 10) for _, count in matches)
@@ -129,10 +138,10 @@ def do_spin():
         st.info("😢 Tidak ada kemenangan.")
 
     if scatters >= 4 and not free:
-        st.success(f"🟡 Dapat {scatters} SCATTER! Kamu mendapat 15 Free Spins!")
+        st.success(f"🟡 {scatters} SCATTER! Dapat 15 Free Spins!")
         st.session_state.freespin += 15
 
-# Tombol aksi
+# Tombol
 col1, col2 = st.columns(2)
 with col1:
     if st.button("🎰 SPIN / FREE SPIN"):
@@ -142,3 +151,4 @@ with col2:
         st.session_state.saldo = 10000
         st.session_state.freespin = 0
         st.session_state.total_win = 0
+        st.session_state.spin_count = 0
