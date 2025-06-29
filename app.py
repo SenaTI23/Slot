@@ -1,52 +1,51 @@
-import random
-import time
+import streamlit as st
+import chess
+import chess.svg
+import base64
+import io
 
-# Setup game
-player_positions = {"Player 1": 0, "Player 2": 0}
-turn = "Player 1"
-goal = 30  # Finish line
+# Fungsi untuk menampilkan papan catur
+def render_board(board):
+    svg = chess.svg.board(board=board)
+    return f'<img src="data:image/svg+xml;base64,{base64.b64encode(svg.encode("utf-8")).decode("utf-8")}"/>'
 
-def roll_dice():
-    return random.randint(1, 6)
+# Inisialisasi session state untuk papan
+if "board" not in st.session_state:
+    st.session_state.board = chess.Board()
 
-def move_player(player, steps):
-    player_positions[player] += steps
-    if player_positions[player] > goal:
-        player_positions[player] = goal
-    print(f"{player} rolled {steps} and moved to {player_positions[player]}")
+st.title("♟️ Game Catur Sederhana")
 
-def check_winner():
-    for player, pos in player_positions.items():
-        if pos == goal:
-            print(f"\n🎉 {player} wins the game! 🎉")
-            return True
-    return False
+# Tampilkan papan catur
+st.markdown(render_board(st.session_state.board), unsafe_allow_html=True)
 
-def display_board():
-    board = ["_" for _ in range(goal + 1)]
-    for player, pos in player_positions.items():
-        if pos <= goal:
-            board[pos] = player[0]  # P1 or P2
-    print("Board: ", " ".join(board))
+# Form untuk input langkah
+with st.form("move_form"):
+    col1, col2 = st.columns(2)
+    with col1:
+        move_input = st.text_input("Masukkan langkah (misal: e2e4)", max_chars=5)
+    with col2:
+        submit = st.form_submit_button("Jalankan Langkah")
 
-# Run game automatically
-def play_game():
-    global turn
-    game_over = False
-    print("🎲 Ludo Game Start (Auto Turns)\n")
+if submit:
+    try:
+        move = chess.Move.from_uci(move_input)
+        if move in st.session_state.board.legal_moves:
+            st.session_state.board.push(move)
+        else:
+            st.warning("Langkah tidak valid.")
+    except:
+        st.warning("Format langkah salah. Gunakan format seperti e2e4.")
 
-    round_counter = 1
-    while not game_over:
-        print(f"\n--- Round {round_counter} ---")
-        steps = roll_dice()
-        move_player(turn, steps)
-        display_board()
-        game_over = check_winner()
-        if not game_over:
-            turn = "Player 2" if turn == "Player 1" else "Player 1"
-        time.sleep(1)
-        round_counter += 1
+# Tombol reset
+if st.button("🔄 Reset Papan"):
+    st.session_state.board = chess.Board()
 
-    print("Game Over.")
-
-play_game()
+# Info status permainan
+if st.session_state.board.is_checkmate():
+    st.success("Skakmat! Permainan selesai.")
+elif st.session_state.board.is_stalemate():
+    st.info("Stalemate! Seri.")
+elif st.session_state.board.is_insufficient_material():
+    st.info("Remis karena material tidak cukup.")
+elif st.session_state.board.is_check():
+    st.warning("Skak!")
