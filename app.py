@@ -1,121 +1,60 @@
-import os
-import tempfile
-import zipfile
+
+Toggle Sidebar
+
+BLACKBOXAI
+
+New
+
+Share
+
+
+    
+    # Balance display
+    st.markdown("### 💰 SALDO")
+    st.progress(st.session_state.balance / 2000)
+    st.write(f"**{st.session_state.balance}** coins")
+    
+    # Bet control
+    st.markdown("### 🎰 TARUHAN")
+    st.progress(st.session_state.current_bet / 500)
+    st.write(f"**{st.session_state.current_bet}** coins per spin")
+    
+    btn_col1, btn_col2 = st.columns(2)
+    with btn_col1:
+        if st.button("-10", disabled=st.session_state.current_bet <= 10):
+            adjust_bet(-10)
+    with btn_col2:
+        if st.button("+10", disabled=st.session_state.current_bet >= 500):
+            adjust_bet(10)
+    
+    st.markdown("### 🏆 PEMBAYARAN")
+    payout_df = pd.DataFrame([
+        {"Simbol": s["name"], "2 Simbol": f"{s['multiplier']}x", "3 Simbol": f"{s['multiplier']**2}x"}
+        for s in sorted(symbols, key=lambda x: -x["multiplier"])
+    ])
+    st.table(payout_df)
+    
+    st.markdown("### ⏳ RIWAYAT")
+    for h in st.session_state.history:
+        st.markdown(f"&lt;div class='history-item'&gt;"
+                    f"&lt;span&gt;{h['time']}&lt;/span&gt
+
+Aku ingin membuat aplikasi slot seperti pragmatic olympus.aku ingin fitur animasi dan smuanya sama.aku  pengen file app.py dan requirement.txt nya untuk aku deploy dengan streamlit.io.aku pake hp
+
+Copy message
+Edit message
+BLACKBOXAI
+
+Saya akan membuat aplikasi slot game seperti Pragmatic Olympus yang siap untuk di-deploy di Streamlit.io. Berikut ini adalah implementasi lengkap dalam satu file Python (app.py) yang sudah disesuaikan untuk penggunaan di smartphone dan dilengkapi dengan requirements.txt.
+
+app.py
+
+py
+240 lines
+Click to close
 import streamlit as st
-from PIL import Image
-import fitz  # PyMuPDF
-import subprocess
-
-def compress_pdf(input_path, output_path):
-    pdf = fitz.open(input_path)
-    pdf.save(output_path, garbage=4, deflate=True)
-    return os.path.getsize(output_path)
-
-def compress_image(input_path, output_path, quality, resize_ratio=1.0):
-    img = Image.open(input_path).convert("RGB")
-    if resize_ratio < 1.0:
-        img = img.resize((int(img.width * resize_ratio), int(img.height * resize_ratio)))
-    img.save(output_path, optimize=True, quality=quality)
-    return os.path.getsize(output_path)
-
-def compress_video(input_path, output_path, crf):
-    subprocess.run([
-        'ffmpeg', '-y', '-i', input_path,
-        '-vcodec', 'libx264', '-crf', str(crf),
-        '-preset', 'veryslow', output_path
-    ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    return os.path.getsize(output_path)
-
-def compress_audio(input_path, output_path, bitrate):
-    subprocess.run([
-        'ffmpeg', '-y', '-i', input_path,
-        '-b:a', bitrate, output_path
-    ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    return os.path.getsize(output_path)
-
-def zip_file(input_path, output_path):
-    with zipfile.ZipFile(output_path, 'w', zipfile.ZIP_DEFLATED) as zf:
-        zf.write(input_path, os.path.basename(input_path))
-    return os.path.getsize(output_path)
-
-def compress_with_target(input_path, target_mb):
-    input_ext = os.path.splitext(input_path)[1].lower()
-    base = os.path.basename(input_path)
-    out_dir = tempfile.gettempdir()
-    output_path = os.path.join(out_dir, "compressed_" + base)
-
-    original_size = os.path.getsize(input_path) / 1024 / 1024  # in MB
-    target_ratio = target_mb / original_size
-
-    if input_ext in ['.pdf']:
-        compress_pdf(input_path, output_path)
-
-    elif input_ext in ['.jpg', '.jpeg', '.png', '.webp']:
-        if target_ratio > 0.8:
-            quality, resize = 85, 1.0
-        elif target_ratio > 0.5:
-            quality, resize = 60, 0.9
-        elif target_ratio > 0.2:
-            quality, resize = 40, 0.8
-        else:
-            quality, resize = 25, 0.6
-        compress_image(input_path, output_path, quality, resize)
-
-    elif input_ext in ['.mp4', '.mov', '.avi', '.mkv']:
-        if target_ratio > 0.8:
-            crf = 22
-        elif target_ratio > 0.5:
-            crf = 28
-        elif target_ratio > 0.2:
-            crf = 35
-        else:
-            crf = 40
-        output_path = output_path.replace(input_ext, ".mp4")
-        compress_video(input_path, output_path, crf)
-
-    elif input_ext in ['.mp3', '.wav', '.ogg', '.aac']:
-        if target_ratio > 0.8:
-            bitrate = "192k"
-        elif target_ratio > 0.5:
-            bitrate = "128k"
-        elif target_ratio > 0.2:
-            bitrate = "64k"
-        else:
-            bitrate = "32k"
-        output_path = output_path.replace(input_ext, ".mp3")
-        compress_audio(input_path, output_path, bitrate)
-
-    else:
-        output_path += ".zip"
-        zip_file(input_path, output_path)
-
-    return output_path, original_size
-
-# ================= STREAMLIT UI =================
-
-st.title("📦 File Compressor with Target Size (MB)")
-st.markdown("Upload file besar dan masukkan ukuran target dalam MB. Kami bantu kompres otomatis!")
-
-uploaded = st.file_uploader("📁 Upload File", type=None)
-target_size = st.number_input("🎯 Target Ukuran File (MB)", min_value=1.0, step=1.0)
-
-if uploaded and target_size:
-    try:
-        file_name = uploaded.name
-        temp_dir = tempfile.mkdtemp()
-        tmp_path = os.path.join(temp_dir, file_name)
-
-        with open(tmp_path, "wb") as f:
-            f.write(uploaded.read())
-
-        with st.spinner("🔄 Sedang mengompres file..."):
-            output_path, original_size = compress_with_target(tmp_path, target_size)
-            final_size = os.path.getsize(output_path) / 1024 / 1024
-
-        st.success(f"✅ Kompresi selesai!")
-        st.markdown(f"📦 Ukuran awal: **{original_size:.2f} MB**  \n📉 Ukuran akhir: **{final_size:.2f} MB**")
-
-        with open(output_path, "rb") as f:
-            st.download_button("⬇️ Download File Terkompres", f, file_name=os.path.basename(output_path))
-    except Exception as e:
-        st.error(f"❌ Gagal mengompres: {str(e)}")
+import random
+...
+Copy message
+Export
+Scroll to bottom
